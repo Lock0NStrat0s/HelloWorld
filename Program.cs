@@ -1367,11 +1367,19 @@
 
 //LEVEL 31: THE FOUNTAIN OF OBJECTS
 
-//BOSS BATTLE (BASE):
-//init
-using System.Drawing;
+//BOSS BATTLE:
 
-int gridSize = 4;
+//ask user for grid size
+Console.Write("1 - Small\n2 - Medium\n3 - Large\nSelect map size: ");
+string input = Console.ReadLine();
+
+int gridSize = input switch
+{
+    "1" => 4,
+    "2" => 6,
+    "3" => 8,
+    _ => 4
+};
 
 //create grid
 Coordinates coords = new Coordinates(gridSize);
@@ -1382,32 +1390,99 @@ Player player = new Player();
 //run until win/loss condition
 while (true)
 {
-    //Console.ForegroundColor = ConsoleColor.White;
-    Console.WriteLine("-----------------------------------------");
+    Console.Clear();
+    ConsoleHelper.Display("-----------------------------------------", ConsoleColor.Cyan, 0);
     for (int i = 0; i < coords.Grid.GetLength(0); i++)
     {
         for (int j = 0; j < coords.Grid.GetLength(1); j++)
-            coords.Grid[i, j].Show();
+        {
+            if (player.X == j && player.Y == i)
+                ConsoleHelper.Display(coords.Grid[player.Y, player.X].GetType().Name, ConsoleColor.White, 1);
+            else
+                coords.Grid[i, j].Show();
+        }
         Console.WriteLine();
     }
-    player.WhichRoom = coords.Grid[player.Y, player.X];     
-    //Console.ForegroundColor = ConsoleColor.White;
-    Console.WriteLine("-----------------------------------------");
-    player.Run();                                           //run player move
+    ConsoleHelper.Display("-----------------------------------------", ConsoleColor.Cyan, 0);
 
+    //set location of player to grid room
+    player.WhichRoom = coords.Grid[player.Y, player.X];
+
+    //check if player is in a trap room
+    if (player.WhichRoom.GetType().Name == "Pit")
+        player.isAlive = false;
+
+    //check adjacent tiles for any traps
+    AdjacentCheck(player, coords, new Pit());
+    AdjacentCheck(player, coords, new Maelstrom());
+    AdjacentCheck(player, coords, new Amarok());
+
+    //game won or loss
     if (player.isAlive && player.X == 0 && player.Y == 0 && Fountain.ActiveFountain)
     {
-        ConsoleHelper.Display("YOU WIN!", ConsoleColor.DarkBlue);
+        ConsoleHelper.Display("YOU WIN!", ConsoleColor.DarkBlue, 0);
         break;
     }
+    else if (!player.isAlive && player.WhichRoom.GetType().Name == "Pit")
+    {
+        ConsoleHelper.Display("YOU DIE FROM FALLING INTO A PIT!", ConsoleColor.DarkRed, 0);
+        break;
+    }
+
+    //run player move
+    player.Run();                                           
+}
+
+void AdjacentCheck(Player p, Coordinates c, Room r)
+{
+    int tempX = p.X, tempY = p.Y;
+    if (IsOnBoard(tempY, tempX))
+        if (c.Grid[++tempY, tempX].GetType().Name == r.ToString()) SenseDisplay(r);
+    tempX = p.X; tempY = p.Y;
+    if (IsOnBoard(tempY, tempX))
+        if (c.Grid[++tempY, ++tempX].GetType().Name == r.ToString()) SenseDisplay(r);
+    tempX = p.X; tempY = p.Y;
+    if (IsOnBoard(tempY, tempX))
+        if (c.Grid[tempY, ++tempX].GetType().Name == r.ToString()) SenseDisplay(r);
+    tempX = p.X; tempY = p.Y;
+    if (IsOnBoard(tempY, tempX))
+        if (c.Grid[--tempY, ++tempX].GetType().Name == r.ToString()) SenseDisplay(r);
+    tempX = p.X; tempY = p.Y;
+    if (IsOnBoard(tempY, tempX))
+        if (c.Grid[--tempY, tempX].GetType().Name == r.ToString()) SenseDisplay(r);
+    tempX = p.X; tempY = p.Y;
+    if (IsOnBoard(tempY, tempX))
+        if (c.Grid[--tempY, --tempX].GetType().Name == r.ToString()) SenseDisplay(r);
+    tempX = p.X; tempY = p.Y;
+    if (IsOnBoard(tempY, tempX))
+         if (c.Grid[tempY, --tempX].GetType().Name == r.ToString()) SenseDisplay(r);
+    tempX = p.X; tempY = p.Y;
+    if (IsOnBoard(tempY, tempX))
+        if (c.Grid[++tempY, --tempX].GetType().Name == r.ToString()) SenseDisplay(r);
+}
+bool IsOnBoard(int row, int column)
+{
+    if (row < 0) return false;
+    if (row >= gridSize) return false;
+    if (column < 0) return false;
+    if (column >= gridSize) return false;
+    return true;
+}
+void SenseDisplay(Room r)
+{
+    ConsoleHelper.Display("SENSE: " + r.Sense().ToString(), ConsoleColor.DarkRed, 0);
 }
 
 static class ConsoleHelper
 {
-    public static void Display(string write, ConsoleColor colour)
+    //i is arbitrarily used to determine what is being printed (0 - name of room, 1 - anything else)
+    public static void Display(string write, ConsoleColor colour, int i)
     {
         Console.ForegroundColor = colour;
-        Console.Write($"{write} ");
+        if (i == 0)
+            Console.WriteLine(write);
+        else if (i == 1)
+            Console.Write($"{write} ");
         Console.ForegroundColor = ConsoleColor.White;
     }
 }
@@ -1423,9 +1498,9 @@ class Player
     public void Run()
     {
         Console.WriteLine($"You are in the room {WhichRoom} at ({X}, {Y})");
-        //Console.ForegroundColor = ConsoleColor.White;
-        Console.WriteLine($"Fountain Status: {Fountain.ActiveFountain}");
-        Console.WriteLine($"{WhichRoom?.Sense()}");
+        Console.WriteLine($"Is Fountain active? {Fountain.ActiveFountain}");
+        Console.WriteLine("Am I Alive? " + isAlive);
+        ConsoleHelper.Display(WhichRoom?.Sense().ToString(), ConsoleColor.DarkGreen, 0);
         Console.Write("What do you want to do? ");
         string input = Console.ReadLine().ToLower();
 
@@ -1456,14 +1531,18 @@ class Coordinates
         //populate array with coordinates of room
         for (int i = 0; i < Grid.GetLength(0); i++)
             for (int j = 0; j < Grid.GetLength(1); j++)
-            {
-                if (i == 0 && j == 0)
-                    Grid[i, j] = new Entrance();
-                else if (i == 0 && j == 2)
-                    Grid[i, j] = new Fountain();
-                else
-                    Grid[i, j] = new Empty();
-            }
+                Grid[i, j] = new Empty();
+
+        CreateRoom(new Entrance(), 0, 0);
+        CreateRoom(new Fountain(), 0, 2);
+        CreateRoom(new Pit(), 1, 1);
+        CreateRoom(new Maelstrom(), 2, 2);
+        CreateRoom(new Amarok(), 1, 2);
+    }
+
+    public void CreateRoom(Room r, int row, int column)
+    {
+        Grid[row, column] = r;
     }
 }
 
@@ -1524,7 +1603,7 @@ class Entrance : Room
     public override string Sense() => Fountain.ActiveFountain ? "The Found of Objects " +
         "has been reactivated, and you have escaped with your life!" : "You see light" +
         " coming from the cavern entrance.";
-    public override void Show() => ConsoleHelper.Display("ENTRANCE", ConsoleColor.Green);
+    public override void Show() => ConsoleHelper.Display("Entrance", ConsoleColor.Green, 1);
 }
 class Fountain : Room
 {
@@ -1532,14 +1611,27 @@ class Fountain : Room
     public override string Sense() => ActiveFountain ? "You hear the rushing waters" +
         " from the Fountain of Objects. It has been reactivated!" : "You hear water " +
         "dripping in this room. The Fountain of Objects is in this room!";
-    public override void Show() => ConsoleHelper.Display("FOUNTAIN", ConsoleColor.Magenta);
+    public override void Show() => ConsoleHelper.Display("Fountain", ConsoleColor.Magenta, 1);
 }
 class Empty : Room
 {
     public override string Sense() => "See no evil; Speak no evil.";
-    public override void Show() => ConsoleHelper.Display("EMPTY", ConsoleColor.Yellow);
+    public override void Show() => ConsoleHelper.Display("Empty", ConsoleColor.Yellow, 1);
 }
-
-
+class Pit : Room
+{
+    public override string Sense() => "You feel a draft. There is a pit in a nearby room.";
+    public override void Show() => ConsoleHelper.Display("Pit", ConsoleColor.DarkGray, 1);
+}
+class Maelstrom : Room
+{
+    public override string Sense() => "You hear the growling and groaning of a maelstorm nearby.";
+    public override void Show() => ConsoleHelper.Display("Pit", ConsoleColor.DarkCyan, 1);
+}
+class Amarok : Room
+{
+    public override string Sense() => "You smell the rotten stench of an amarok in a nearby room.";
+    public override void Show() => ConsoleHelper.Display("Pit", ConsoleColor.DarkMagenta, 1);
+}
 
 #endregion
